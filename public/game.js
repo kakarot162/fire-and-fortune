@@ -1,4 +1,3 @@
-```javascript
 const socket = io();
 
 let state = null;
@@ -905,4 +904,4 @@ if (presetRoom) {
 
     $("createBtn").classList.add("hidden");
 }
-```
+
