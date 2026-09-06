@@ -1,8 +1,179 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fire & Fortune</title><link rel="stylesheet" href="/style.css"></head>
-<body><div class="embers"></div><main class="shell">
-<section id="lobby" class="panel lobby"><div class="lobby-fire">🔥</div><h1>FIRE &amp; FORTUNE</h1><p>Buy big. Roll fair. Expect chaos.</p><input id="name" maxlength="20" placeholder="Your name" autocomplete="off"><div id="joinBox"><input id="roomCode" maxlength="6" placeholder="Room code" autocomplete="off"><button id="joinBtn">Join</button></div><button id="createBtn" class="primary">Create Private Game</button><p id="error" class="error"></p></section>
-<section id="game" class="hidden"><header class="topbar panel"><div><div class="brand"><span>🔥</span> FIRE &amp; FORTUNE</div><small>Room <b id="codeLabel"></b> · Share the invite with up to 4 friends</small></div><div class="header-actions"><button id="copyBtn">Copy invite link</button><button id="startBtn" class="primary hidden">Start Game</button></div></header>
-<div class="layout"><section class="board-wrap panel"><div id="board" class="board"><div class="center"><div class="hearth">🔥</div><div class="center-title">PROPERTY<br><span>CHAOS</span></div><div class="deck-row"><div class="deck chance-deck"><div class="deck-top">?</div><b>CHANCE</b><small>CHAOS DECK</small></div><div class="deck random-deck"><div class="deck-top">✦</div><b>RANDOM</b><small>WILD DECK</small></div></div><div class="dice-row"><div id="die1" class="die">⚄</div><div id="die2" class="die">⚄</div></div><div id="turnText" class="turn">Waiting for players…</div><div class="actions"><button id="rollBtn" class="primary" disabled>Roll 2 Dice</button><button id="buyBtn" disabled>Buy Property</button><button id="endBtn" disabled>End Turn</button></div></div></div></section>
-<aside class="side"><section class="panel side-panel"><h3>PLAYERS</h3><div id="players"></div></section><section class="panel side-panel"><h3>ACTIVITY</h3><div id="log" class="log"></div></section></aside></div></section></main>
-<div id="cardModal" class="modal hidden"><div class="card-pop"><div id="cardLabel" class="card-label">CHANCE</div><div id="cardText" class="card-text"></div><button id="closeCard" class="primary">Continue</button></div></div>
-<script src="/socket.io/socket.io.js"></script><script src="/game.js"></script></body></html>
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    >
+    <title>Fire &amp; Fortune</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+
+  <body>
+    <div class="embers"></div>
+
+    <main class="shell">
+      <!-- Lobby -->
+      <section id="lobby" class="panel lobby">
+        <div class="lobby-fire">🔥</div>
+
+        <h1>FIRE &amp; FORTUNE</h1>
+
+        <p>Buy big. Roll fair. Expect chaos.</p>
+
+        <input
+          id="name"
+          maxlength="20"
+          placeholder="Your name"
+          autocomplete="off"
+        >
+
+        <div id="joinBox">
+          <input
+            id="roomCode"
+            maxlength="6"
+            placeholder="Room code"
+            autocomplete="off"
+          >
+
+          <button id="joinBtn">Join</button>
+        </div>
+
+        <button id="createBtn" class="primary">
+          Create Private Game
+        </button>
+
+        <p id="error" class="error"></p>
+      </section>
+
+      <!-- Game -->
+      <section id="game" class="hidden">
+        <header class="topbar panel">
+          <div>
+            <div class="brand">
+              <span>🔥</span> FIRE &amp; FORTUNE
+            </div>
+
+            <small>
+              Room <b id="codeLabel"></b> · Share the invite with up to 4 friends
+            </small>
+          </div>
+
+          <div class="header-actions">
+            <button id="copyBtn">
+              Copy invite link
+            </button>
+
+            <button id="startBtn" class="primary hidden">
+              Start Game
+            </button>
+          </div>
+        </header>
+
+        <div class="layout">
+          <!-- Board -->
+          <section class="board-wrap panel">
+            <div id="board" class="board">
+              <div class="center">
+                <div class="hearth">🔥</div>
+
+                <div class="center-title">
+                  PROPERTY<br>
+                  <span>CHAOS</span>
+                </div>
+
+                <!-- Card Decks -->
+                <div class="deck-row">
+                  <div class="deck chance-deck">
+                    <div class="deck-top">?</div>
+                    <b>CHANCE</b>
+                    <small>CHAOS DECK</small>
+                  </div>
+
+                  <div class="deck random-deck">
+                    <div class="deck-top">✦</div>
+                    <b>RANDOM</b>
+                    <small>WILD DECK</small>
+                  </div>
+                </div>
+
+                <!-- Dice -->
+                <div class="dice-row">
+                  <div id="die1" class="die">⚄</div>
+                  <div id="die2" class="die">⚄</div>
+                </div>
+
+                <!-- Turn Information -->
+                <div id="turnText" class="turn">
+                  Waiting for players…
+                </div>
+
+                <!-- Game Actions -->
+                <div class="actions">
+                  <button
+                    id="rollBtn"
+                    class="primary"
+                    disabled
+                  >
+                    Roll 2 Dice
+                  </button>
+
+                  <button
+                    id="buyBtn"
+                    disabled
+                  >
+                    Buy Property
+                  </button>
+
+                  <button
+                    id="endBtn"
+                    disabled
+                  >
+                    End Turn
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Sidebar -->
+          <aside class="side">
+            <!-- Players -->
+            <section class="panel side-panel">
+              <h3>PLAYERS</h3>
+              <div id="players"></div>
+            </section>
+
+            <!-- Activity -->
+            <section class="panel side-panel">
+              <h3>ACTIVITY</h3>
+              <div id="log" class="log"></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <!-- Card Modal -->
+    <div id="cardModal" class="modal hidden">
+      <div class="card-pop">
+        <div id="cardLabel" class="card-label">
+          CHANCE
+        </div>
+
+        <div id="cardText" class="card-text"></div>
+
+        <button id="closeCard" class="primary">
+          Continue
+        </button>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/game.js"></script>
+  </body>
+</html>
+```
