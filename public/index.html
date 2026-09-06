@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wild Property Empire</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="firelight"></div>
+
+  <main class="shell">
+    <section id="lobby" class="panel lobby">
+      <h1>🔥 Wild Property Empire</h1>
+      <p class="subtitle">A chaotic browser property game with two dice, crazy cards and zero rigged rolls.</p>
+      <input id="name" maxlength="20" placeholder="Your name" autocomplete="off" />
+      <div id="joinBox">
+        <input id="roomCode" maxlength="6" placeholder="Room code" autocomplete="off" />
+        <button id="joinBtn">Join Room</button>
+      </div>
+      <button id="createBtn" class="primary">Create New Room</button>
+      <p id="error" class="error"></p>
+    </section>
+
+    <section id="game" class="hidden">
+      <header class="topbar panel">
+        <div>
+          <h1>🔥 Wild Property Empire</h1>
+          <div>Room: <b id="codeLabel"></b> <button id="copyBtn" class="small">Copy invite link</button></div>
+        </div>
+        <button id="startBtn" class="primary hidden">Start Game</button>
+      </header>
+
+      <div class="layout">
+        <section class="board-wrap panel">
+          <div id="board" class="board">
+            <div class="center">
+              <div class="flame">🔥</div>
+              <h2>WILD<br>PROPERTY<br>EMPIRE</h2>
+              <div class="dice-row">
+                <div id="die1" class="die">⚄</div>
+                <div id="die2" class="die">⚄</div>
+              </div>
+              <div id="turnText">Waiting for players…</div>
+              <div class="actions">
+                <button id="rollBtn" class="primary" disabled>Roll Dice</button>
+                <button id="buyBtn" disabled>Buy</button>
+                <button id="endBtn" disabled>End Turn</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="side">
+          <section class="panel">
+            <h3>Players</h3>
+            <div id="players"></div>
+          </section>
+          <section class="panel">
+            <h3>Game Log</h3>
+            <div id="log" class="log"></div>
+          </section>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <div id="cardModal" class="modal hidden">
+    <div class="card-pop panel">
+      <div id="cardLabel" class="card-label">CHANCE</div>
+      <div id="cardText" class="card-text"></div>
+      <button id="closeCard">Continue</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/game.js"></script>
+</body>
+</html>
