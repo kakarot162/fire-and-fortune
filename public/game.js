@@ -95,12 +95,14 @@ function renderBoard(){
     el.innerHTML = `
       <div>${tile.name}</div>
       <div class="tokens">${playersHere.map(p=>`<span class="token" title="${escapeHtml(p.name)}" style="background:${p.color}"></span>`).join("")}</div>
-      ${tile.price ? `<div class="price">₹${tile.price}</div>` : ""}
+      ${tile.price ? `<div class="price">$${tile.price.toLocaleString()}</div>` : ""}
       ${owner ? `<div class="owner" style="background:${owner.color}"></div>` : ""}
     `;
     board.appendChild(el);
   });
 }
+
+function money(n){ return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(n); }
 
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
 
@@ -109,7 +111,7 @@ function renderPlayers(){
     <div class="player ${p.id===state.currentPlayerId?"current":""} ${p.bankrupt?"bankrupt":""}">
       <span class="swatch" style="background:${p.color}"></span>
       <span>${escapeHtml(p.name)} ${i===0?"👑":""}</span>
-      <b>₹${p.money}</b>
+      <b>${money(p.money)}</b>
     </div>
   `).join("");
 }
@@ -143,7 +145,7 @@ function renderControls(){
   if(me && mine && rolledThisTurn){
     const t = state.board[me.pos];
     canBuy = ["property","station"].includes(t.type) && !state.properties[me.pos] && me.money >= t.price;
-    $("buyBtn").textContent = canBuy ? `Buy ${t.name} — ₹${t.price}` : "Buy";
+    $("buyBtn").textContent = canBuy ? `Buy ${t.name} — $${t.price.toLocaleString()}` : "Buy";
   }
   $("buyBtn").disabled = !canBuy || !!state.winner;
 }
