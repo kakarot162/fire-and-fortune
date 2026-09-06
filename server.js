@@ -1,367 +1,54 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const crypto = require("crypto");
-const path = require("path");
-
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
-
-app.use(express.static(path.join(__dirname, "public")));
-
-const PORT = process.env.PORT || 3000;
-const rooms = new Map();
-
-const COLORS = ["#ff4d6d", "#4dabf7", "#ffd43b", "#69db7c", "#b197fc"];
-
-const BOARD = [
-  {name:"START", type:"go"},
-  {name:"Cinder Lane", type:"property", price:600, rent:80, group:"ember"},
-  {name:"Random", type:"random"},
-  {name:"Ash Street", type:"property", price:600, rent:100, group:"ember"},
-  {name:"Heat Tax", type:"tax", amount:10000},
-  {name:"Oak Station", type:"station", price:2000, rent:250},
-  {name:"Maple Avenue", type:"property", price:1000, rent:120, group:"gold"},
-  {name:"Chance", type:"chance"},
-  {name:"Birch Avenue", type:"property", price:1000, rent:120, group:"gold"},
-  {name:"Cedar Avenue", type:"property", price:1200, rent:140, group:"gold"},
-  {name:"JAIL / VISITING", type:"jail"},
-  {name:"Pine Crescent", type:"property", price:1400, rent:160, group:"green"},
-  {name:"Random", type:"random"},
-  {name:"Walnut Crescent", type:"property", price:1400, rent:160, group:"green"},
-  {name:"Teak Crescent", type:"property", price:1600, rent:180, group:"green"},
-  {name:"Flame Station", type:"station", price:2000, rent:250},
-  {name:"Rosewood Road", type:"property", price:1800, rent:200, group:"blue"},
-  {name:"Chance", type:"chance"},
-  {name:"Mahogany Road", type:"property", price:1800, rent:200, group:"blue"},
-  {name:"Ebony Road", type:"property", price:2000, rent:220, group:"blue"},
-  {name:"FREE FIRE", type:"free"},
-  {name:"Sandalwood Way", type:"property", price:2200, rent:240, group:"purple"},
-  {name:"Random", type:"random"},
-  {name:"Juniper Way", type:"property", price:2200, rent:240, group:"purple"},
-  {name:"Redwood Way", type:"property", price:2400, rent:260, group:"purple"},
-  {name:"Coal Station", type:"station", price:2000, rent:250},
-  {name:"Cherry Boulevard", type:"property", price:2600, rent:280, group:"red"},
-  {name:"Spruce Boulevard", type:"property", price:2600, rent:280, group:"red"},
-  {name:"Chance", type:"chance"},
-  {name:"Sequoia Boulevard", type:"property", price:2800, rent:300, group:"red"},
-  {name:"GO TO JAIL", type:"gotojail"},
-  {name:"Ironwood Park", type:"property", price:3000, rent:320, group:"orange"},
-  {name:"Bamboo Park", type:"property", price:3000, rent:320, group:"orange"},
-  {name:"Random", type:"random"},
-  {name:"Acacia Park", type:"property", price:3200, rent:350, group:"orange"},
-  {name:"Blaze Station", type:"station", price:2000, rent:250},
-  {name:"Chance", type:"chance"},
-  {name:"Kingwood Heights", type:"property", price:3500, rent:400, group:"black"},
-  {name:"Luxury Tax", type:"tax", amount:1500},
-  {name:"Phoenix Heights", type:"property", price:4000, rent:500, group:"black"}
-];
-
-const CHANCE = [
-  {text:"🔥 FIRE SALE! Lose $1,500.", effect:{kind:"money", amount:-1500}},
-  {text:"💸 Jackpot! Collect $2,500.", effect:{kind:"money", amount:2500}},
-  {text:"🌀 Portal jump: move forward 7 spaces.", effect:{kind:"move", amount:7}},
-  {text:"👟 Backtrack! Move back 4 spaces.", effect:{kind:"move", amount:-4}},
-  {text:"🚔 Straight to jail. No argument.", effect:{kind:"jail"}},
-  {text:"🎁 Everyone chips in $500 for you.", effect:{kind:"collectAll", amount:500}},
-  {text:"💣 Oops. Pay every other player $400.", effect:{kind:"payAll", amount:400}},
-  {text:"🔀 CHAOS SWAP! Swap position with a random opponent.", effect:{kind:"swap"}},
-  {text:"🧲 Magnet move: teleport to START and collect $2,000.", effect:{kind:"go"}},
-  {text:"🎲 Double trouble: roll again after this turn.", effect:{kind:"extraTurn"}}
-];
-
-const RANDOM = [
-  {text:"🌟 Lucky spark! +$1,200.", effect:{kind:"money", amount:1200}},
-  {text:"🧯 Fire extinguisher bill: -$750.", effect:{kind:"money", amount:-750}},
-  {text:"🎭 Street performance goes viral: +$1,800.", effect:{kind:"money", amount:1800}},
-  {text:"🐿️ A squirrel stole your wallet: -$600.", effect:{kind:"money", amount:-600}},
-  {text:"🚀 Rocket boost: move forward 5.", effect:{kind:"move", amount:5}},
-  {text:"🧊 Frozen turn: skip your next turn.", effect:{kind:"skip"}},
-  {text:"🤝 Kindness tax: give the poorest opponent $1,000.", effect:{kind:"givePoor", amount:10000}},
-  {text:"🏆 Tiny tournament win: +$2,000.", effect:{kind:"money", amount:2000}},
-  {text:"🪙 Coin storm! Every player gets $500.", effect:{kind:"allMoney", amount:500}},
-  {text:"🕳️ Trapdoor! Move back 6.", effect:{kind:"move", amount:-6}}
-];
-
-function rnd(max) { return crypto.randomInt(0, max); }
-function die() { return crypto.randomInt(1, 7); }
-
-function makeRoom(code) {
-  return {
-    code,
-    started:false,
-    players:[],
-    turnIndex:0,
-    properties:{},
-    log:["Room created."],
-    winner:null
-  };
-}
-
-function sanitizeName(name) {
-  return String(name || "").replace(/[<>]/g, "").trim().slice(0, 20) || "Player";
-}
-
-function roomState(room) {
-  return {
-    code: room.code,
-    started: room.started,
-    players: room.players,
-    turnIndex: room.turnIndex,
-    currentPlayerId: room.players[room.turnIndex]?.id || null,
-    properties: room.properties,
-    board: BOARD,
-    log: room.log.slice(-25),
-    winner: room.winner
-  };
-}
-
-function emitRoom(room) {
-  io.to(room.code).emit("state", roomState(room));
-}
-
-function addLog(room, msg) {
-  room.log.push(msg);
-  if (room.log.length > 100) room.log.shift();
-}
-
-function applyMove(room, player, delta) {
-  let old = player.pos;
-  let next = old + delta;
-  if (delta > 0 && next >= BOARD.length) {
-    player.money += 2000;
-    addLog(room, `${player.name} passed START and collected $2,000.`);
-  }
-  while (next < 0) next += BOARD.length;
-  player.pos = next % BOARD.length;
-}
-
-function land(room, player) {
-  const tile = BOARD[player.pos];
-  if (!tile) return;
-
-  if (tile.type === "tax") {
-    player.money -= tile.amount;
-    addLog(room, `${player.name} paid ${tile.amount} tax.`);
-  } else if (tile.type === "gotojail") {
-    player.pos = 10;
-    player.jail = 1;
-    addLog(room, `${player.name} was sent to jail.`);
-  } else if (tile.type === "chance") {
-    drawCard(room, player, CHANCE, "Chance");
-  } else if (tile.type === "random") {
-    drawCard(room, player, RANDOM, "Random");
-  } else if (tile.type === "property" || tile.type === "station") {
-    const ownerId = room.properties[player.pos];
-    if (ownerId && ownerId !== player.id) {
-      const owner = room.players.find(p => p.id === ownerId);
-      if (owner && !owner.bankrupt) {
-        const rent = tile.rent;
-        player.money -= rent;
-        owner.money += rent;
-        addLog(room, `${player.name} paid ${rent} rent to ${owner.name}.`);
-      }
-    }
-  }
-  checkBankruptcy(room, player);
-}
-
-function drawCard(room, player, deck, label) {
-  const card = deck[rnd(deck.length)];
-  addLog(room, `${label}: ${card.text}`);
-  io.to(room.code).emit("card", {playerId: player.id, label, text: card.text});
-  const e = card.effect;
-
-  if (e.kind === "money") player.money += e.amount;
-  if (e.kind === "move") {
-    applyMove(room, player, e.amount);
-    land(room, player);
-  }
-  if (e.kind === "jail") {
-    player.pos = 10; player.jail = 1;
-  }
-  if (e.kind === "collectAll") {
-    room.players.filter(p=>p.id!==player.id && !p.bankrupt).forEach(p=>{
-      const amt = Math.min(e.amount, Math.max(0,p.money));
-      p.money -= amt; player.money += amt;
-    });
-  }
-  if (e.kind === "payAll") {
-    room.players.filter(p=>p.id!==player.id && !p.bankrupt).forEach(p=>{
-      const amt = Math.min(e.amount, Math.max(0,player.money));
-      player.money -= amt; p.money += amt;
-    });
-  }
-  if (e.kind === "swap") {
-    const others = room.players.filter(p=>p.id!==player.id && !p.bankrupt);
-    if (others.length) {
-      const other = others[rnd(others.length)];
-      [player.pos, other.pos] = [other.pos, player.pos];
-      addLog(room, `${player.name} swapped positions with ${other.name}.`);
-    }
-  }
-  if (e.kind === "go") {
-    player.pos = 0; player.money += 2000;
-  }
-  if (e.kind === "extraTurn") player.extraTurn = true;
-  if (e.kind === "skip") player.skip = 1;
-  if (e.kind === "givePoor") {
-    const others = room.players.filter(p=>p.id!==player.id && !p.bankrupt).sort((a,b)=>a.money-b.money);
-    if (others.length) {
-      const amt = Math.min(e.amount, Math.max(0,player.money));
-      player.money -= amt; others[0].money += amt;
-      addLog(room, `${player.name} gave ${amt} to ${others[0].name}.`);
-    }
-  }
-  if (e.kind === "allMoney") room.players.filter(p=>!p.bankrupt).forEach(p=>p.money += e.amount);
-  checkBankruptcy(room, player);
-}
-
-function checkBankruptcy(room, player) {
-  if (player.money >= 0 || player.bankrupt) return;
-  player.bankrupt = true;
-  addLog(room, `${player.name} went bankrupt!`);
-  Object.keys(room.properties).forEach(k => {
-    if (room.properties[k] === player.id) delete room.properties[k];
-  });
-  const alive = room.players.filter(p=>!p.bankrupt);
-  if (alive.length === 1 && room.started) {
-    room.winner = alive[0].id;
-    addLog(room, `🏆 ${alive[0].name} wins the game!`);
-  }
-}
-
-function nextTurn(room) {
-  if (!room.players.length) return;
-  let guard = 0;
-  do {
-    room.turnIndex = (room.turnIndex + 1) % room.players.length;
-    const p = room.players[room.turnIndex];
-    if (!p.bankrupt) {
-      if (p.skip > 0) {
-        p.skip--;
-        addLog(room, `${p.name} skipped this turn.`);
-      } else {
-        return;
-      }
-    }
-    guard++;
-  } while (guard < room.players.length * 2);
-}
-
-io.on("connection", socket => {
-  socket.on("createRoom", ({name}) => {
-    let code;
-    do { code = crypto.randomBytes(3).toString("hex").toUpperCase(); } while (rooms.has(code));
-    const room = makeRoom(code);
-    rooms.set(code, room);
-    const player = {
-      id: socket.id,
-      name:sanitizeName(name),
-      color:COLORS[0],
-      pos:0,money:15000,jail:0,skip:0,extraTurn:false,bankrupt:false
-    };
-    room.players.push(player);
-    socket.join(code);
-    socket.data.roomCode = code;
-    addLog(room, `${player.name} joined.`);
-    socket.emit("roomCreated", {code});
-    emitRoom(room);
-  });
-
-  socket.on("joinRoom", ({name, code}) => {
-    code = String(code || "").trim().toUpperCase();
-    const room = rooms.get(code);
-    if (!room) return socket.emit("errorMsg", "Room not found.");
-    if (room.started) return socket.emit("errorMsg", "Game already started.");
-    if (room.players.length >= 5) return socket.emit("errorMsg", "Room is full.");
-    const idx = room.players.length;
-    const player = {
-      id:socket.id,
-      name:sanitizeName(name),
-      color:COLORS[idx],
-      pos:0,money:15000,jail:0,skip:0,extraTurn:false,bankrupt:false
-    };
-    room.players.push(player);
-    socket.join(code);
-    socket.data.roomCode = code;
-    addLog(room, `${player.name} joined.`);
-    socket.emit("joinedRoom", {code});
-    emitRoom(room);
-  });
-
-  socket.on("startGame", () => {
-    const room = rooms.get(socket.data.roomCode);
-    if (!room || room.players[0]?.id !== socket.id) return;
-    if (room.players.length < 2) return socket.emit("errorMsg","Need at least 2 players.");
-    room.started = true;
-    room.turnIndex = rnd(room.players.length);
-    addLog(room, `${room.players[room.turnIndex].name} goes first — chosen randomly.`);
-    emitRoom(room);
-  });
-
-  socket.on("rollDice", () => {
-    const room = rooms.get(socket.data.roomCode);
-    if (!room || !room.started || room.winner) return;
-    const p = room.players[room.turnIndex];
-    if (!p || p.id !== socket.id || p.bankrupt) return;
-    if (p.jail > 0) {
-      p.jail--;
-      addLog(room, `${p.name} served a jail turn.`);
-      nextTurn(room);
-      return emitRoom(room);
-    }
-    const d1 = die(), d2 = die();
-    const total = d1 + d2;
-    io.to(room.code).emit("dice", {playerId:p.id,d1,d2});
-    addLog(room, `${p.name} rolled ${d1} + ${d2} = ${total}.`);
-    applyMove(room, p, total);
-    land(room, p);
-    emitRoom(room);
-  });
-
-  socket.on("buyProperty", () => {
-    const room = rooms.get(socket.data.roomCode);
-    if (!room || !room.started || room.winner) return;
-    const p = room.players[room.turnIndex];
-    if (!p || p.id !== socket.id) return;
-    const tile = BOARD[p.pos];
-    if (!tile || !["property","station"].includes(tile.type)) return;
-    if (room.properties[p.pos]) return;
-    if (p.money < tile.price) return socket.emit("errorMsg","Not enough money.");
-    p.money -= tile.price;
-    room.properties[p.pos] = p.id;
-    addLog(room, `${p.name} bought ${tile.name} for ${tile.price}.`);
-    emitRoom(room);
-  });
-
-  socket.on("endTurn", () => {
-    const room = rooms.get(socket.data.roomCode);
-    if (!room || !room.started || room.winner) return;
-    const p = room.players[room.turnIndex];
-    if (!p || p.id !== socket.id) return;
-    if (p.extraTurn) {
-      p.extraTurn = false;
-      addLog(room, `${p.name} gets an extra turn!`);
-    } else {
-      nextTurn(room);
-    }
-    emitRoom(room);
-  });
-
-  socket.on("disconnect", () => {
-    const code = socket.data.roomCode;
-    const room = rooms.get(code);
-    if (!room) return;
-    const p = room.players.find(x=>x.id===socket.id);
-    if (p) {
-      p.bankrupt = true;
-      addLog(room, `${p.name} disconnected.`);
-      checkBankruptcy(room,p);
-    }
-    emitRoom(room);
-  });
+const express=require('express');
+const http=require('http');
+const {Server}=require('socket.io');
+const crypto=require('crypto');
+const path=require('path');
+const app=express(), server=http.createServer(app), io=new Server(server);
+app.use(express.static(path.join(__dirname,'public')));
+const PORT=process.env.PORT||3000, rooms=new Map();
+const COLORS=['#ff4d6d','#4dabf7','#ffd43b','#69db7c','#b197fc'];
+const TURN_MS=45000;
+const BOARD=[
+{name:'START',type:'go'},
+{name:'Cinder Lane',type:'property',price:600,rent:80,group:'ember'}, {name:'Random',type:'random'}, {name:'Ash Street',type:'property',price:600,rent:100,group:'ember'}, {name:'Heat Tax',type:'tax',amount:1000}, {name:'Oak Station',type:'station',price:2000,rent:250}, {name:'Maple Avenue',type:'property',price:1000,rent:120,group:'gold'}, {name:'Chance',type:'chance'}, {name:'Birch Avenue',type:'property',price:1000,rent:120,group:'gold'}, {name:'Cedar Avenue',type:'property',price:1200,rent:140,group:'gold'},
+{name:'JAIL / VISITING',type:'jail'}, {name:'Pine Crescent',type:'property',price:1400,rent:160,group:'green'}, {name:'Random',type:'random'}, {name:'Walnut Crescent',type:'property',price:1400,rent:160,group:'green'}, {name:'Teak Crescent',type:'property',price:1600,rent:180,group:'green'}, {name:'Flame Station',type:'station',price:2000,rent:250}, {name:'Rosewood Road',type:'property',price:1800,rent:200,group:'blue'}, {name:'Chance',type:'chance'}, {name:'Mahogany Road',type:'property',price:1800,rent:200,group:'blue'}, {name:'Ebony Road',type:'property',price:2000,rent:220,group:'blue'},
+{name:'FREE FIRE',type:'free'}, {name:'Sandalwood Way',type:'property',price:2200,rent:240,group:'purple'}, {name:'Random',type:'random'}, {name:'Juniper Way',type:'property',price:2200,rent:240,group:'purple'}, {name:'Redwood Way',type:'property',price:2400,rent:260,group:'purple'}, {name:'Coal Station',type:'station',price:2000,rent:250}, {name:'Cherry Boulevard',type:'property',price:2600,rent:280,group:'red'}, {name:'Spruce Boulevard',type:'property',price:2600,rent:280,group:'red'}, {name:'Chance',type:'chance'}, {name:'Sequoia Boulevard',type:'property',price:2800,rent:300,group:'red'},
+{name:'GO TO JAIL',type:'gotojail'}, {name:'Ironwood Park',type:'property',price:3000,rent:320,group:'orange'}, {name:'Bamboo Park',type:'property',price:3000,rent:320,group:'orange'}, {name:'Random',type:'random'}, {name:'Acacia Park',type:'property',price:3200,rent:350,group:'orange'}, {name:'Blaze Station',type:'station',price:2000,rent:250}, {name:'Chance',type:'chance'}, {name:'Kingwood Heights',type:'property',price:3500,rent:400,group:'black'}, {name:'Luxury Tax',type:'tax',amount:1500}, {name:'Phoenix Heights',type:'property',price:4000,rent:500,group:'black'}];
+const CHANCE=[['FIRE SALE! Lose $1,500.',-1500],['Jackpot! Collect $2,500.',2500],['Lucky break! Collect $1,000.',1000],['Repair bill. Pay $700.',-700]];
+const RANDOM=[['Lucky spark! Collect $1,200.',1200],['Fire extinguisher bill. Pay $750.',-750],['Street performance goes viral! Collect $1,800.',1800],['A squirrel stole your wallet. Pay $600.',-600]];
+const rnd=n=>crypto.randomInt(0,n), die=()=>crypto.randomInt(1,7);
+function name(n){return String(n||'').replace(/[<>]/g,'').trim().slice(0,20)||'Player'}
+function groups(){const g={};BOARD.forEach((t,i)=>{if(t.group)(g[t.group]??=[]).push(i)});return g} const GROUPS=groups();
+function makeRoom(code){return {code,started:false,players:[],turnIndex:0,properties:{},buildings:{},log:['Room created.'],winner:null,rolled:false,turnEndsAt:null,pendingPurchase:null,auction:null,trade:null,timer:null,moveLock:false}}
+function log(r,m){r.log.push(m);if(r.log.length>100)r.log.shift()}
+function state(r){return {code:r.code,started:r.started,players:r.players,turnIndex:r.turnIndex,currentPlayerId:r.players[r.turnIndex]?.id||null,properties:r.properties,buildings:r.buildings,board:BOARD,log:r.log.slice(-30),winner:r.winner,rolled:r.rolled,turnEndsAt:r.turnEndsAt,pendingPurchase:r.pendingPurchase,auction:r.auction&&{pos:r.auction.pos,highest:r.auction.highest,highestId:r.auction.highestId,endsAt:r.auction.endsAt},trade:r.trade&&{from:r.trade.from,to:r.trade.to,offer:r.trade.offer},groups:GROUPS}}
+function emit(r){io.to(r.code).emit('state',state(r))}
+function clearTurn(r){if(r.timer){clearTimeout(r.timer);r.timer=null}}
+function armTurn(r){clearTurn(r);r.turnEndsAt=Date.now()+TURN_MS;r.timer=setTimeout(()=>{if(!r.started||r.winner||r.auction||r.pendingPurchase)return;const p=r.players[r.turnIndex];log(r,`⏰ ${p.name} ran out of time.`);nextTurn(r);emit(r)},TURN_MS+100)}
+function active(r){return r.players.filter(p=>!p.bankrupt)}
+function bankrupt(r,p){if(p.money>=0||p.bankrupt)return;p.bankrupt=true;log(r,`${p.name} went bankrupt!`);Object.keys(r.properties).forEach(k=>{if(r.properties[k]===p.id){delete r.properties[k];delete r.buildings[k]}});const a=active(r);if(a.length===1){r.winner=a[0].id;clearTurn(r);log(r,`🏆 ${a[0].name} wins!`)}}
+function nextTurn(r){r.rolled=false;r.pendingPurchase=null;r.trade=null;let n=0;do{r.turnIndex=(r.turnIndex+1)%r.players.length;const p=r.players[r.turnIndex];if(!p.bankrupt){if(p.skip){p.skip--;log(r,`${p.name} skips a turn.`)}else{armTurn(r);return}}n++}while(n<r.players.length*2)}
+function rentFor(r,pos){const t=BOARD[pos],b=r.buildings[pos]||0;if(t.type==='station'){const owner=r.properties[pos];const count=Object.keys(r.properties).filter(k=>BOARD[k].type==='station'&&r.properties[k]===owner).length;return t.rent*Math.max(1,count)}if(!t.group)return t.rent;if(b===5)return t.rent*10;return t.rent*(b?1+b:1)}
+function ownsGroup(r,pid,g){return GROUPS[g].every(i=>r.properties[i]===pid)}
+function canBuild(r,p,pos){const t=BOARD[pos],b=r.buildings[pos]||0;if(!t?.group||!ownsGroup(r,p.id,t.group)||b>=5)return false;const vals=GROUPS[t.group].map(i=>r.buildings[i]||0);return b===Math.min(...vals)}
+function buildCost(t){return Math.round(t.price*.25)}
+function startAuction(r,pos){const tile=BOARD[pos];r.pendingPurchase=null;r.auction={pos,highest:Math.max(100,Math.round(tile.price*.1)),highestId:null,bidders:active(r).map(p=>p.id),endsAt:Date.now()+20000};log(r,`🔨 Auction started for ${tile.name}!`);clearTurn(r);const watch=setInterval(()=>{if(!r.auction){clearInterval(watch);return}if(Date.now()>=r.auction.endsAt){clearInterval(watch);finishAuction(r)}},500);emit(r)}
+function finishAuction(r){const a=r.auction;if(!a)return;const t=BOARD[a.pos],winner=r.players.find(p=>p.id===a.highestId);if(winner&&winner.money>=a.highest){winner.money-=a.highest;r.properties[a.pos]=winner.id;log(r,`🔨 ${winner.name} won ${t.name} for $${a.highest}.`)}else log(r,`No one bought ${t.name}.`);r.auction=null;armTurn(r);emit(r)}
+function land(r,p){const t=BOARD[p.pos];if(t.type==='tax'){p.money-=t.amount;log(r,`${p.name} paid $${t.amount} tax.`)}else if(t.type==='gotojail'){p.pos=10;p.jail=1;log(r,`${p.name} went to jail.`)}else if(t.type==='chance'||t.type==='random'){const c=(t.type==='chance'?CHANCE:RANDOM)[rnd(4)];p.money+=c[1];log(r,`${t.type==='chance'?'Chance':'Random'}: ${c[0]}`);io.to(r.code).emit('card',{playerId:p.id,label:t.type,text:c[0]})}else if(['property','station'].includes(t.type)){const ownerId=r.properties[p.pos];if(ownerId&&ownerId!==p.id){const o=r.players.find(x=>x.id===ownerId);if(o&&!o.bankrupt){const rent=rentFor(r,p.pos);p.money-=rent;o.money+=rent;log(r,`${p.name} paid $${rent} rent to ${o.name}.`)}}else if(!ownerId){r.pendingPurchase={playerId:p.id,pos:p.pos};log(r,`${p.name} may buy ${t.name} or send it to auction.`)}}bankrupt(r,p)}
+function animateMove(r,p,steps){if(r.moveLock)return;r.moveLock=true;const dir=steps>=0?1:-1,left=Math.abs(steps);let i=0;const from=p.pos;const timer=setInterval(()=>{p.pos=(p.pos+dir+BOARD.length)%BOARD.length;if(dir>0&&p.pos===0){p.money+=2000;log(r,`${p.name} passed START and collected $2,000.`)}i++;io.to(r.code).emit('moveStep',{playerId:p.id,pos:p.pos,step:i,total:left});emit(r);if(i>=left){clearInterval(timer);r.moveLock=false;land(r,p);emit(r)}},260)}
+function validTurn(r,sid){if(!r)return false;const p=r.players[r.turnIndex];return r.started&&!r.winner&&!r.auction&&!r.moveLock&&p&&p.id===sid&&!p.bankrupt}
+io.on('connection',socket=>{
+ socket.on('createRoom',({name:n})=>{let code;do code=crypto.randomBytes(3).toString('hex').toUpperCase();while(rooms.has(code));const r=makeRoom(code),p={id:socket.id,name:name(n),color:COLORS[0],pos:0,money:15000,jail:0,skip:0,bankrupt:false};r.players.push(p);rooms.set(code,r);socket.join(code);socket.data.roomCode=code;log(r,`${p.name} joined.`);socket.emit('roomCreated',{code});emit(r)});
+ socket.on('joinRoom',({name:n,code})=>{code=String(code||'').trim().toUpperCase();const r=rooms.get(code);if(!r)return socket.emit('errorMsg','Room not found.');if(r.started)return socket.emit('errorMsg','Game already started.');if(r.players.length>=5)return socket.emit('errorMsg','Room is full.');const p={id:socket.id,name:name(n),color:COLORS[r.players.length],pos:0,money:15000,jail:0,skip:0,bankrupt:false};r.players.push(p);socket.join(code);socket.data.roomCode=code;log(r,`${p.name} joined.`);socket.emit('joinedRoom',{code});emit(r)});
+ socket.on('startGame',()=>{const r=rooms.get(socket.data.roomCode);if(!r||r.players[0]?.id!==socket.id)return;if(r.players.length<2)return socket.emit('errorMsg','Need at least 2 players.');r.started=true;r.turnIndex=rnd(r.players.length);log(r,`${r.players[r.turnIndex].name} goes first!`);armTurn(r);emit(r)});
+ socket.on('rollDice',()=>{const r=rooms.get(socket.data.roomCode);if(!validTurn(r,socket.id)||r.rolled)return;const p=r.players[r.turnIndex];if(p.jail){p.jail--;log(r,`${p.name} served a jail turn.`);nextTurn(r);return emit(r)}r.rolled=true;const d1=die(),d2=die(),total=d1+d2;io.to(r.code).emit('dice',{playerId:p.id,d1,d2});log(r,`${p.name} rolled ${d1}+${d2}=${total}.`);animateMove(r,p,total);emit(r)});
+ socket.on('buyProperty',()=>{const r=rooms.get(socket.data.roomCode);if(!validTurn(r,socket.id))return;const p=r.players[r.turnIndex],q=r.pendingPurchase,t=q&&BOARD[q.pos];if(!q||q.playerId!==p.id||!t)return;if(p.money<t.price)return socket.emit('errorMsg','Not enough money.');p.money-=t.price;r.properties[q.pos]=p.id;r.pendingPurchase=null;log(r,`${p.name} bought ${t.name} for $${t.price}.`);emit(r)});
+ socket.on('declineProperty',()=>{const r=rooms.get(socket.data.roomCode),p=r?.players[r.turnIndex];if(!r||!p||p.id!==socket.id||!r.pendingPurchase||r.pendingPurchase.playerId!==p.id)return;startAuction(r,r.pendingPurchase.pos)});
+ socket.on('auctionBid',({amount})=>{const r=rooms.get(socket.data.roomCode),a=r?.auction,p=r?.players.find(x=>x.id===socket.id);amount=Number(amount);if(!r||!a||!p||p.bankrupt||!a.bidders.includes(p.id)||!Number.isFinite(amount)||amount<=a.highest||amount>p.money)return socket.emit('errorMsg','Invalid bid.');a.highest=Math.floor(amount);a.highestId=p.id;a.endsAt=Date.now()+7000;log(r,`${p.name} bids $${a.highest}!`);emit(r)});
+ socket.on('endTurn',()=>{const r=rooms.get(socket.data.roomCode);if(!validTurn(r,socket.id)||!r.rolled||r.pendingPurchase)return socket.emit('errorMsg',r?.pendingPurchase?'Buy or auction the property first.':'Roll before ending your turn.');nextTurn(r);emit(r)});
+ socket.on('build',({pos})=>{const r=rooms.get(socket.data.roomCode);if(!validTurn(r,socket.id))return;const p=r.players[r.turnIndex],i=Number(pos),t=BOARD[i];if(!canBuild(r,p,i))return socket.emit('errorMsg','You need the full colour set and must build evenly.');const cost=buildCost(t);if(p.money<cost)return socket.emit('errorMsg','Not enough money.');p.money-=cost;r.buildings[i]=(r.buildings[i]||0)+1;log(r,`${p.name} built ${r.buildings[i]===5?'a HOTEL':`house ${r.buildings[i]}`} on ${t.name}.`);emit(r)});
+ socket.on('proposeTrade',({to,properties,money})=>{const r=rooms.get(socket.data.roomCode),p=r?.players[r.turnIndex],other=r?.players.find(x=>x.id===to);if(!r||!p||p.id!==socket.id||!other||other.bankrupt)return;const list=[...new Set((properties||[]).map(Number))].filter(i=>r.properties[i]===p.id);const cash=Math.max(0,Math.floor(Number(money)||0));if(cash>p.money)return socket.emit('errorMsg','You cannot offer that much cash.');r.trade={from:p.id,to:other.id,offer:{properties:list,money:cash}};log(r,`${p.name} proposed a trade to ${other.name}.`);emit(r)});
+ socket.on('respondTrade',({accept,giveProperties,giveMoney})=>{const r=rooms.get(socket.data.roomCode),tr=r?.trade;if(!r||!tr||tr.to!==socket.id)return;const a=r.players.find(p=>p.id===tr.from),b=r.players.find(p=>p.id===tr.to);if(!accept){r.trade=null;log(r,`${b.name} declined the trade.`);return emit(r)}const gp=[...new Set((giveProperties||[]).map(Number))].filter(i=>r.properties[i]===b.id);const gm=Math.max(0,Math.floor(Number(giveMoney)||0));if(gm>b.money){return socket.emit('errorMsg','Not enough money for that trade.')}tr.offer.properties.forEach(i=>r.properties[i]=b.id);gp.forEach(i=>r.properties[i]=a.id);a.money-=tr.offer.money;b.money+=tr.offer.money;b.money-=gm;a.money+=gm;r.trade=null;log(r,`🤝 ${a.name} and ${b.name} completed a trade.`);emit(r)});
+ socket.on('disconnect',()=>{const r=rooms.get(socket.data.roomCode),p=r?.players.find(x=>x.id===socket.id);if(!r||!p)return;p.bankrupt=true;log(r,`${p.name} disconnected.`);Object.keys(r.properties).forEach(k=>{if(r.properties[k]===p.id){delete r.properties[k];delete r.buildings[k]}});if(active(r).length===1&&r.started){r.winner=active(r)[0].id;clearTurn(r)}emit(r)});
 });
-
-server.listen(PORT, () => console.log(`Wild Property Empire running on port ${PORT}`));
+server.listen(PORT,()=>console.log(`Fire & Fortune running on ${PORT}`));
