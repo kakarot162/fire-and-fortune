@@ -1,0 +1,14 @@
+{
+  "name": "wild-property-empire",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multiplayer browser property board game with crazy chance and random cards.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}
