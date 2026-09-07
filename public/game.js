@@ -1,11 +1,11 @@
 const socket = io();
 let myId=null, roomCode=null, state=null, selectedCharacter="car", rolled=false;
-let scene,camera,renderer,boardGroup,cloudGroup,raycaster,mouse;
+let scene,camera,renderer,boardGroup,cloudGroup,raycaster,mouse,diceGroup;
 let orbitState=null;
 const cameraHome={pos:new THREE.Vector3(0,23,24),look:new THREE.Vector3(0,0,0)};
 const cameraFocus={active:false,pos:new THREE.Vector3(),look:new THREE.Vector3(),until:0};
 const cameraLook=new THREE.Vector3(0,0,0);
-const tileMeshes=[], tokenGroups=new Map(), tokenTargets=new Map(), buildingGroups=new Map();
+const tileMeshes=[], tokenGroups=new Map(), tokenTargets=new Map(), buildingGroups=new Map(); let dice3D=[]; let diceAnim=null;
 let latestTrade=null, musicOn=false, audioCtx=null, musicTimer=null;
 
 const $=id=>document.getElementById(id);
@@ -44,8 +44,8 @@ $("buyBtn").onclick=()=>socket.emit("buyProperty");
 $("auctionBtn").onclick=()=>socket.emit("startAuction");
 $("endBtn").onclick=()=>{rolled=false;socket.emit("endTurn");};
 
-socket.on("dice",({d1,d2})=>{$("die1").textContent=diceChars[d1-1];$("die2").textContent=diceChars[d2-1];pulseDice();});
-socket.on("card",({label,text})=>{$("cardLabel").textContent=label.toUpperCase();$("cardText").textContent=text;$("cardModal").classList.remove("hidden");});
+socket.on("dice",({d1,d2})=>{ $("die1").textContent=diceChars[d1-1];$("die2").textContent=diceChars[d2-1];document.querySelectorAll(".die").forEach(d=>{d.classList.remove("rolling");void d.offsetWidth;d.classList.add("rolling")});pulseDice();roll3DDice(d1,d2);});
+socket.on("card",({label,text})=>{ const id=label.toLowerCase()==="chance"?"chanceDeck":"randomDeck",deck=$(id);deck?.classList.add("shuffle");setTimeout(()=>deck?.classList.remove("shuffle"),1550);setTimeout(()=>{$("cardLabel").textContent=label.toUpperCase();$("cardText").textContent=text;$("cardModal").classList.remove("hidden");},650);});
 socket.on("tradeOffer",offer=>{latestTrade=offer;renderTradeOffer(offer);$("tradeOfferModal").classList.remove("hidden");});
 $("acceptTrade").onclick=()=>{if(latestTrade)socket.emit("tradeResponse",{tradeId:latestTrade.id,accept:true});$("tradeOfferModal").classList.add("hidden");};
 $("rejectTrade").onclick=()=>{if(latestTrade)socket.emit("tradeResponse",{tradeId:latestTrade.id,accept:false});$("tradeOfferModal").classList.add("hidden");};
@@ -87,7 +87,7 @@ function init3D(){
   scene.add(new THREE.HemisphereLight(0xffffff,0x4f6c7a,1.35));
   const sun=new THREE.DirectionalLight(0xffffff,1.6);sun.position.set(12,28,8);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);scene.add(sun);
   boardGroup=new THREE.Group();scene.add(boardGroup);
-  makePhysicalBoard();makeClouds3D();
+  makePhysicalBoard();makeClouds3D();make3DDice();
   window.addEventListener("resize",onResize);setupOrbit(root);animate();
 }
 function makePhysicalBoard(){
@@ -118,6 +118,13 @@ function makePhysicalBoard(){
   });
 }
 function tileRotation(i){if(i<=10)return 0;if(i<=20)return -Math.PI/2;if(i<=30)return Math.PI;return Math.PI/2;}
+
+function make3DDice(){
+  diceGroup=new THREE.Group();scene.add(diceGroup);const mat=new THREE.MeshStandardMaterial({color:0xf5f1e8,roughness:.35,metalness:.05});
+  for(let n=0;n<2;n++){const g=new THREE.Group();const cube=new THREE.Mesh(new THREE.BoxGeometry(.9,.9,.9),mat);cube.castShadow=true;g.add(cube);g.position.set(n?1.2:-1.2,8,0);g.visible=false;diceGroup.add(g);dice3D.push(g);}
+}
+function roll3DDice(d1,d2){if(!dice3D.length)return;diceAnim={start:performance.now(),values:[d1,d2]};dice3D.forEach((d,i)=>{d.visible=true;d.position.set(i?1.3:-1.3,7+i,0);d.rotation.set(0,0,0);});}
+function animateDice3D(){if(!diceAnim)return;const q=Math.min(1,(performance.now()-diceAnim.start)/1100);dice3D.forEach((d,i)=>{d.position.y=7*(1-q)+.95+Math.sin(q*Math.PI)*.7;d.position.z=-1.2+q*1.2;d.rotation.x=q*(8+i*3);d.rotation.y=q*(7+i*4);if(q>=1){d.rotation.x=[0,Math.PI/2,Math.PI,Math.PI*1.5,Math.PI/2,0][diceAnim.values[i]-1]||0;}});if(q>=1){setTimeout(()=>dice3D.forEach(d=>d.visible=false),900);diceAnim=null;}}
 
 function makeClouds3D(){
   cloudGroup=new THREE.Group();scene.add(cloudGroup);
@@ -154,7 +161,7 @@ function updateCamera(){
 }
 function onResize(){const r=$("threeRoot");if(!r||!renderer)return;camera.aspect=r.clientWidth/r.clientHeight;camera.updateProjectionMatrix();renderer.setSize(r.clientWidth,r.clientHeight);}
 function animate(){
-  requestAnimationFrame(animate);updateClouds();animateTokens();updateCamera();renderer?.render(scene,camera);
+  requestAnimationFrame(animate);updateClouds();animateTokens();animateDice3D();updateCamera();renderer?.render(scene,camera);
 }
 function disposeGroup(g){g.traverse(o=>{o.geometry?.dispose?.();if(Array.isArray(o.material))o.material.forEach(m=>m.dispose?.());else o.material?.dispose?.();});}
 
@@ -215,9 +222,9 @@ function syncBuildings(){
   Object.entries(state.buildings||{}).forEach(([k,level])=>{
     const idx=Number(k);if(!level)return;const p=tileCoord(idx),g=new THREE.Group();
     const houseMat=new THREE.MeshStandardMaterial({color:0x2ca25f,roughness:.6}),hotelMat=new THREE.MeshStandardMaterial({color:0xc9302c,roughness:.55});
-    if(level<5){
+    if(level<=4){
       for(let n=0;n<level;n++){const h=new THREE.Mesh(new THREE.BoxGeometry(.28,.34,.28),houseMat);h.position.set((n%2)*.36-.18,.22,Math.floor(n/2)*.36-.18);h.castShadow=true;g.add(h);}
-    }else{const h=new THREE.Mesh(new THREE.BoxGeometry(.72,.62,.42),hotelMat);h.position.y=.35;h.castShadow=true;g.add(h);}
+    }else{for(let hNo=0;hNo<level-4;hNo++){const h=new THREE.Mesh(new THREE.BoxGeometry(.62,.58,.40),hotelMat);h.position.set((hNo-.5)*.72,.36,0);h.castShadow=true;g.add(h);}}
     g.position.set(p.x,.52,p.z);boardGroup.add(g);buildingGroups.set(idx,g);
   });
 }
@@ -269,7 +276,7 @@ function renderProperties(){
     const t=state.board[i],level=state.buildings[i]||0;
     const ownedSame=t.type==="railway"?Object.keys(state.owners).filter(k=>state.owners[k]===myId&&state.board[k].type==="railway").length:t.type==="utility"?Object.keys(state.owners).filter(k=>state.owners[k]===myId&&state.board[k].type==="utility").length:0;
     const rent=t.type==="property"?t.rent*[1,5,15,45,80,125][level]:t.type==="railway"?400*ownedSame:250*ownedSame;
-    return `<div class="property-item"><div class="property-title">${esc(t.name)}</div><div>${t.group?`<span class="group-badge" style="background:${groupCss[t.group]}">${t.group}</span>`:""} ${t.type}</div><div>Current rent: <b>${money(rent)}</b></div>${t.type==="property"?`<div>Buildings: ${level===5?"🏨 Hotel":"🏠".repeat(level)||"None"} · Build ${money(t.buildCost)}</div><button onclick="buildAt(${i})" ${level>=5?"disabled":""}>Build here</button>`:""}</div>`;
+    return `<div class="property-item"><div class="property-title">${esc(t.name)}</div><div>${t.group?`<span class="group-badge" style="background:${groupCss[t.group]}">${t.group}</span>`:""} ${t.type}</div><div>Current rent: <b>${money(rent)}</b></div>${t.type==="property"?`<div>Buildings: ${level>=5?`🏨 Hotel ${level-4}`:"🏠".repeat(level)||"None"} · Next build ${money(t.buildCost*Math.pow(2,level))}</div><button onclick="buildAt(${i})" ${level>=5?"disabled":""}>Build here</button>`:""}</div>`;
   }).join(""):`<p>You don't own any properties yet.</p>`;
 }
 window.buildAt=i=>socket.emit("build",{tileIndex:i});
