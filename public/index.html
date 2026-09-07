@@ -1,7 +1,177 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fire & Fortune</title><link rel="stylesheet" href="/style.css"></head><body><div class="embers"></div><main class="shell"><section id="lobby" class="panel lobby"><div class="lobby-fire">🔥</div><h1>FIRE &amp; FORTUNE</h1><p>2–5 player multiplayer property game.</p><input id="name" maxlength="20" placeholder="Your name" autocomplete="off"><div id="joinBox"><input id="roomCode" maxlength="6" placeholder="Room code"><button id="joinBtn">Join</button></div><button id="createBtn" class="primary">Create Private Game</button><p id="error" class="error"></p></section>
-<section id="game" class="hidden"><header class="topbar panel"><div><div class="brand">🔥 FIRE &amp; FORTUNE</div><small>Room <b id="codeLabel"></b> · Play with any 2 to 5 players</small></div><div class="header-actions"><button id="soundBtn">🔊 Sound</button><button id="copyBtn">Copy invite link</button><button id="startBtn" class="primary hidden">Start Game</button></div></header><div class="layout"><section class="board-wrap panel"><div id="board" class="board board-3d"><div id="board3d" class="board3d"></div><div class="center center-overlay"><div class="hearth">🔥</div><div class="center-title">PROPERTY<br><span>CHAOS</span></div><div class="deck-row"><div class="deck chance-deck"><div class="deck-top">?</div><b>CHANCE</b><small>CHAOS DECK</small></div><div class="deck random-deck"><div class="deck-top">✦</div><b>RANDOM</b><small>WILD DECK</small></div></div><div class="dice-row"><div id="die1" class="die">⚄</div><div id="die2" class="die">⚄</div></div><div id="turnText" class="turn">Waiting for players…</div><div id="timerText" class="timer">45s</div><div class="actions"><button id="rollBtn" class="primary" disabled>Roll 2 Dice</button><button id="buyBtn" disabled>Buy Property</button><button id="auctionBtn" disabled>🔨 Auction</button><button id="propertyBtn">My Properties</button><button id="buildBtn" disabled>🏠 Build</button><button id="tradeBtn" disabled>🤝 Trade</button><button id="endBtn" disabled>End Turn</button></div></div></div></section><aside class="side"><section class="panel side-panel"><h3>PLAYERS</h3><div id="players"></div></section><section class="panel side-panel"><h3>ACTIVITY</h3><div id="log" class="log"></div></section></aside></div></section></main>
-<div id="cardModal" class="modal hidden"><div class="card-pop"><div id="cardLabel" class="card-label">CHANCE</div><div id="cardText" class="card-text"></div><button id="closeCard" class="primary">Continue</button></div></div>
-<div id="propertyModal" class="modal hidden"><div class="card-pop wide"><h2>My Properties</h2><div id="propertyList"></div><button data-close="propertyModal">Close</button></div></div>
-<div id="auctionModal" class="modal hidden"><div class="card-pop"><h2>🔨 Auction</h2><div id="auctionInfo"></div><input id="bidAmount" type="number" min="0" placeholder="Your bid"><button id="bidBtn" class="primary">Place Bid</button></div></div>
-<div id="tradeModal" class="modal hidden"><div class="card-pop wide"><h2>🤝 Trade</h2><div id="tradeInfo"></div><div id="tradeControls"></div><button id="tradeSend" class="primary">Send Trade</button><button data-close="tradeModal">Close</button></div></div>
-<script src="/socket.io/socket.io.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script src="/game.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Fire & Fortune — Sky Edition</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="sky-bg">
+    <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div><div class="cloud c4"></div>
+  </div>
+
+  <main class="app-shell">
+    <section id="lobby" class="glass lobby">
+      <div class="logo-orb">🔥</div>
+      <h1>FIRE &amp; FORTUNE</h1>
+      <p class="lead">A 3D multiplayer property game for 2–5 players.</p>
+
+      <label>Your name</label>
+      <input id="name" maxlength="20" placeholder="Enter your name" autocomplete="off">
+
+      <label>Choose your character</label>
+      <div id="characterPicker" class="character-picker">
+        <button class="character active" data-character="car">🚗<span>Car</span></button>
+        <button class="character" data-character="plane">✈️<span>Plane</span></button>
+        <button class="character" data-character="boat">⛵<span>Boat</span></button>
+        <button class="character" data-character="bike">🏍️<span>Bike</span></button>
+        <button class="character" data-character="rocket">🚀<span>Rocket</span></button>
+      </div>
+
+      <label>Starting money (host)</label>
+      <select id="startMoney">
+        <option value="5000">$5,000</option>
+        <option value="10000">$10,000</option>
+        <option value="15000" selected>$15,000</option>
+        <option value="20000">$20,000</option>
+        <option value="25000">$25,000</option>
+        <option value="30000">$30,000</option>
+      </select>
+
+      <div class="join-row">
+        <input id="roomCode" maxlength="6" placeholder="Room code">
+        <button id="joinBtn">Join Room</button>
+      </div>
+      <button id="createBtn" class="primary wide-btn">Create Private Game</button>
+      <p id="error" class="error"></p>
+    </section>
+
+    <section id="game" class="hidden">
+      <header class="glass topbar">
+        <div>
+          <div class="brand">🔥 FIRE &amp; FORTUNE</div>
+          <div class="room-line">Room <b id="codeLabel"></b> · <span id="roomSettings"></span></div>
+        </div>
+        <div class="header-actions">
+          <button id="musicBtn">🎵 Music Off</button>
+          <button id="copyBtn">🔗 Copy Invite</button>
+          <button id="startBtn" class="primary hidden">▶ Start Game</button>
+        </div>
+      </header>
+
+      <div class="game-layout">
+        <section class="glass board-panel">
+          <div id="threeRoot" class="three-root"></div>
+
+          <div class="hud-center">
+            <div class="decks">
+              <div class="deck chance"><span>?</span><b>CHANCE</b><small>DRAW ONLY WHEN LANDED ON</small></div>
+              <div class="deck random"><span>✦</span><b>RANDOM</b><small>DRAW ONLY WHEN LANDED ON</small></div>
+            </div>
+            <div class="dice-wrap">
+              <div id="die1" class="die">⚄</div>
+              <div id="die2" class="die">⚄</div>
+            </div>
+            <div id="turnText" class="turn-text">Waiting for players…</div>
+            <div class="timer-bar"><div id="timerFill"></div></div>
+            <div id="timerText" class="timer-text">45s</div>
+
+            <div class="action-grid">
+              <button id="rollBtn" class="primary" disabled>🎲 Roll Dice</button>
+              <button id="buyBtn" disabled>🏷 Buy</button>
+              <button id="auctionBtn" disabled>🔨 Auction</button>
+              <button id="propertyBtn">🏘 Properties</button>
+              <button id="buildBtn" disabled>🏠 Build</button>
+              <button id="tradeBtn" disabled>🤝 Trade</button>
+              <button id="endBtn" disabled>➡ End Turn</button>
+            </div>
+          </div>
+        </section>
+
+        <aside class="right-column">
+          <section class="glass side-card">
+            <h3>PLAYERS</h3>
+            <div id="players"></div>
+          </section>
+          <section class="glass side-card">
+            <h3>ACTIVITY</h3>
+            <div id="log" class="log"></div>
+          </section>
+          <section class="glass side-card legend">
+            <h3>RENT RULES</h3>
+            <p>🚆 Railway: $400 × railways owned</p>
+            <p>💧⚡ Utilities: $250 × all utilities owned</p>
+          </section>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <div id="cardModal" class="modal hidden">
+    <div class="modal-card">
+      <div id="cardLabel" class="modal-kicker"></div>
+      <h2 id="cardText"></h2>
+      <button data-close="cardModal" class="primary">Continue</button>
+    </div>
+  </div>
+
+  <div id="propertyModal" class="modal hidden">
+    <div class="modal-card wide">
+      <h2>🏘 My Properties</h2>
+      <div id="propertyList" class="property-list"></div>
+      <button data-close="propertyModal">Close</button>
+    </div>
+  </div>
+
+  <div id="auctionModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-kicker">LIVE AUCTION</div>
+      <h2 id="auctionTitle">Property Auction</h2>
+      <div id="auctionInfo"></div>
+      <input id="bidAmount" type="number" min="0" step="100" placeholder="Your bid">
+      <button id="bidBtn" class="primary">Place Bid</button>
+    </div>
+  </div>
+
+  <div id="tradeModal" class="modal hidden">
+    <div class="modal-card trade-card">
+      <h2>🤝 Build a Trade</h2>
+      <label>Trade with</label>
+      <select id="tradeTarget"></select>
+      <div class="trade-columns">
+        <div>
+          <h3>You Give</h3>
+          <label>Cash</label><input id="offerMoney" type="number" min="0" value="0">
+          <div id="offerProps" class="trade-props"></div>
+        </div>
+        <div>
+          <h3>You Receive</h3>
+          <label>Cash</label><input id="requestMoney" type="number" min="0" value="0">
+          <div id="requestProps" class="trade-props"></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="tradeSend" class="primary">Send Offer</button>
+        <button data-close="tradeModal">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tradeOfferModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-kicker">TRADE OFFER</div>
+      <h2 id="tradeOfferTitle"></h2>
+      <div id="tradeOfferBody"></div>
+      <div class="modal-actions">
+        <button id="acceptTrade" class="primary">Accept</button>
+        <button id="rejectTrade">Reject</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="/game.js"></script>
+</body>
+</html>
