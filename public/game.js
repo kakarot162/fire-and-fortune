@@ -106,7 +106,14 @@ function makePhysicalBoard(){
   if(!state)return;
   state.board.forEach((t,i)=>{
     const p=tileCoord(i), tex=textureForTile(t,i);
-    const mat=[new THREE.MeshStandardMaterial({color:0xd8c6a9}),new THREE.MeshStandardMaterial({color:0xd8c6a9}),new THREE.MeshStandardMaterial({color:0xd8c6a9}),new THREE.MeshStandardMaterial({color:0xd8c6a9}),new THREE.MeshStandardMaterial({map:tex,roughness:.82}),new THREE.MeshStandardMaterial({color:0xcab28c})];
+   const mat=[
+  new THREE.MeshStandardMaterial({color:0xd8c6a9}),
+  new THREE.MeshStandardMaterial({color:0xd8c6a9}),
+  new THREE.MeshBasicMaterial({map:tex}),
+  new THREE.MeshStandardMaterial({color:0xcab28c}),
+  new THREE.MeshStandardMaterial({color:0xd8c6a9}),
+  new THREE.MeshStandardMaterial({color:0xd8c6a9})
+];
     const mesh=new THREE.Mesh(new THREE.BoxGeometry(1.62,.25,1.62),mat);
     mesh.position.set(p.x,.30,p.z);mesh.rotation.y=tileRotation(i);mesh.receiveShadow=true;mesh.castShadow=true;mesh.userData={tileIndex:i};boardGroup.add(mesh);tileMeshes[i]=mesh;
   });
