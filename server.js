@@ -206,7 +206,7 @@ function rentFor(room,idx){
   if(t.type==="utility") return 250*utilityCount(room,owner.id);
   if(t.type==="property"){
     const level=room.buildings[idx]||0;
-    const mult=[1,5,15,45,80,125][level]||1;
+    const mult=[1,5,15,45,80,125,170][level]||1;
     return t.rent*mult;
   }
   return 0;
@@ -225,7 +225,7 @@ function canBuildEvenly(room,pid,idx){
   const group=groupIndexes(t.group);
   const levels=group.map(i=>room.buildings[i]||0);
   const here=room.buildings[idx]||0;
-  if(here>=5) return false;
+  if(here>=6) return false;
   return here===Math.min(...levels);
 }
 
@@ -414,11 +414,14 @@ io.on("connection",socket=>{
     const room=rooms.get(socket.data.roomCode);const p=room?.players.find(x=>x.id===socket.id&&!x.bankrupt);
     const idx=Number(tileIndex),t=BOARD[idx];
     if(!room||!p||!t||t.type!=="property")return;
-    if(!canBuildEvenly(room,p.id,idx))return socket.emit("errorMsg","Own the full colour set and build evenly across it.");
-    if(p.money<t.buildCost)return socket.emit("errorMsg","Not enough cash to build.");
-    p.money-=t.buildCost;room.buildings[idx]=(room.buildings[idx]||0)+1;
+    if(!ownsGroup(room,p.id,t.group)) return socket.emit("errorMsg",`You need the full ${t.group.toUpperCase()} colour set before building.`);
+    if(!canBuildEvenly(room,p.id,idx))return socket.emit("errorMsg","Build evenly across your full colour set.");
+    const currentLevel=room.buildings[idx]||0;
+    const cost=t.buildCost*Math.pow(2,currentLevel);
+    if(p.money<cost)return socket.emit("errorMsg",`Not enough cash. This build costs $${cost.toLocaleString()}.`);
+    p.money-=cost;room.buildings[idx]=currentLevel+1;
     const level=room.buildings[idx];
-    log(room,level===5?`${p.name} built a HOTEL on ${t.name}.`:`${p.name} built house ${level} on ${t.name}.`);
+    log(room,level===5?`${p.name} built HOTEL 1 on ${t.name}.`:level===6?`${p.name} built HOTEL 2 on ${t.name}.`:`${p.name} built house ${level} on ${t.name} for $${cost.toLocaleString()}.`);
     emit(room);
   });
 
