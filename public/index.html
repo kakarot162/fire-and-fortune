@@ -66,16 +66,16 @@
 
           <div class="hud-center">
             <div class="decks">
-              <div class="deck chance"><span>?</span><b>CHANCE</b><small>DRAW ONLY WHEN LANDED ON</small></div>
-              <div class="deck random"><span>✦</span><b>RANDOM</b><small>DRAW ONLY WHEN LANDED ON</small></div>
+              <div id="chanceDeck" class="deck-stack chance"><i></i><i></i><div class="deck"><span>?</span><b>CHANCE</b><small>DRAW WHEN LANDED ON</small></div></div>
+              <div id="randomDeck" class="deck-stack random"><i></i><i></i><div class="deck"><span>✦</span><b>RANDOM</b><small>DRAW WHEN LANDED ON</small></div></div>
             </div>
             <div class="dice-wrap">
               <div id="die1" class="die">⚄</div>
               <div id="die2" class="die">⚄</div>
             </div>
-            <div id="turnText" class="turn-text">Waiting for players…</div>
+            <div class="turn-status"><div id="turnText" class="turn-text">Waiting for players…</div>
             <div class="timer-bar"><div id="timerFill"></div></div>
-            <div id="timerText" class="timer-text">45s</div>
+            <div id="timerText" class="timer-text">45s</div></div>
 
             <div class="action-grid">
               <button id="rollBtn" class="primary" disabled>🎲 Roll Dice</button>
